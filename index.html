@@ -68,7 +68,13 @@ progress{accent-color:var(--green);width:100%;height:8px}
 .sheet-title label{font-size:12px;font-weight:700}
 .sheet-title input{width:100%;min-width:0;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--white);font-size:13px}
 .sheet-title input::placeholder{color:var(--muted)}
+.sheet-options{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;padding:9px 16px;border-bottom:1px solid var(--line);font-size:12px}
+.sheet-options label{display:inline-flex;align-items:center;gap:5px}
+.sheet-options input[type="checkbox"]{accent-color:var(--green)}
+.sheet-options input[type="number"]{width:64px;padding:4px 5px;border:1px solid var(--line);border-radius:5px}
 .columns,.cut{display:grid;grid-template-columns:minmax(112px,1.15fr) minmax(82px,.65fr) minmax(122px,1.65fr) 28px;column-gap:12px}
+.sheet.hide-time .timing{display:none}
+.sheet.hide-time .columns,.sheet.hide-time .cut{grid-template-columns:minmax(112px,1.15fr) minmax(122px,2.3fr) 28px}
 .columns{background:#f0f3ee;color:var(--muted);padding:8px 16px;border-bottom:1px solid var(--line);font-size:11px;font-weight:700}
 .empty{display:grid;justify-items:center;align-content:center;text-align:center;min-height:275px;padding:24px;color:var(--muted)}
 .empty-icon{display:grid;place-items:center;width:48px;height:48px;background:var(--pale);color:var(--green);border-radius:10px;margin-bottom:13px}
@@ -81,9 +87,10 @@ progress{accent-color:var(--green);width:100%;height:8px}
 .preview{padding:0;text-align:left;border:0;background:none;min-width:0}
 .preview img{display:block;width:100%;aspect-ratio:16/9;object-fit:contain;background:#162019;border-radius:5px}
 .serial{display:block;font-size:10px;margin-top:4px;color:var(--green);font-weight:700}
-.length{font-size:15px;font-weight:750}
-.clock{color:var(--muted);font-size:10px;overflow-wrap:anywhere}
-textarea{display:block;width:100%;min-width:0;min-height:77px;border:1px solid var(--line);background:white;border-radius:6px;padding:7px 8px;font-size:12px;resize:vertical}
+.timing label{display:block;color:var(--muted);font-size:10px}
+.timing label+label{margin-top:4px}
+.timing input{display:block;width:100%;min-width:0;padding:3px 4px;border:1px solid var(--line);border-radius:5px;background:var(--white);font-family:var(--mono);font-size:11px}
+textarea{display:block;width:100%;min-width:0;min-height:77px;border:1px solid var(--line);background:white;border-radius:6px;padding:7px 8px;font-size:var(--note-size, 4mm);resize:vertical}
 textarea::placeholder{color:#617066}
 .icon-button{border:0;border-radius:5px;background:transparent;color:var(--muted);padding:5px;min-width:28px;min-height:28px}
 .icon-button svg{width:15px;height:15px}
@@ -93,7 +100,7 @@ footer{color:var(--muted);padding:17px 0 24px;font-size:11px;display:flex;gap:6p
 footer svg{height:13px;width:13px}
 @media(max-width:900px){.workspace{grid-template-columns:minmax(230px,.75fr) minmax(0,1.45fr);gap:12px}.top,.wrap{width:calc(100% - 36px)}.columns,.cut{column-gap:7px;padding-left:10px;padding-right:10px}}
 @media(max-width:740px){.workspace{grid-template-columns:1fr}.source{position:static}.intro{padding:24px 0 16px}.intro p:last-child{font-size:12px}.top{height:58px}.drop{min-height:168px}.sheet{min-height:305px}.empty{min-height:200px}}
-@media(max-width:445px){.top,.wrap{width:calc(100% - 24px)}.intro{align-items:flex-start;flex-direction:column;gap:10px}.columns,.cut{grid-template-columns:minmax(68px,1fr) minmax(58px,.68fr) minmax(83px,1.15fr) 24px;column-gap:5px}.cut{padding-block:9px}.length{font-size:13px}.clock{font-size:9px}.cardhead{padding-inline:10px}.button{padding-inline:8px}}
+@media(max-width:445px){.top,.wrap{width:calc(100% - 24px)}.intro{align-items:flex-start;flex-direction:column;gap:10px}.columns,.cut{grid-template-columns:minmax(68px,1fr) minmax(58px,.68fr) minmax(83px,1.15fr) 24px;column-gap:5px}.sheet.hide-time .columns,.sheet.hide-time .cut{grid-template-columns:minmax(68px,1fr) minmax(83px,1.83fr) 24px}.cut{padding-block:9px}.cardhead{padding-inline:10px}.button{padding-inline:8px}}
 </style>
 </head>
 <body>
@@ -130,13 +137,18 @@ footer svg{height:13px;width:13px}
 </div></div>
 <div class="progress" id="progress-box" hidden><div><span id="status" role="status"></span><button type="button" class="button" id="cancel">中止</button></div><progress id="progress" aria-label="処理の進行状況" max="100"></progress></div>
 </section>
-<section class="card sheet" aria-labelledby="sheet-heading">
+<section class="card sheet" id="sheet" aria-labelledby="sheet-heading">
 <div class="cardhead"><h2 id="sheet-heading"><svg aria-hidden="true"><use href="#sheet"/></svg>カット一覧</h2><span id="count" class="badge">0 CUTS</span></div>
 <div class="sheet-title">
 <label for="sheet-title">カットシートのタイトル</label>
 <input id="sheet-title" type="text" maxlength="160" placeholder="空欄の場合は映像のファイル名を表示">
 </div>
-<div class="columns" aria-hidden="true"><span>キャプチャー</span><span>秒数・開始</span><span>音声メモ</span><span></span></div>
+<div class="sheet-options">
+<label><input type="checkbox" id="show-time" checked>秒数・開始を表示</label>
+<label>音声メモの級数 <input id="note-size" type="number" min="8" max="32" step="1" value="16"> Q</label>
+<p class="hint" id="time-hint">秒数と開始時刻は表示・PDF用の値です。空欄にすると自動値に戻ります。</p>
+</div>
+<div class="columns" aria-hidden="true"><span>キャプチャー</span><span class="timing">秒数・開始</span><span>音声メモ</span><span></span></div>
 <div class="empty" id="empty"><span class="empty-icon"><svg aria-hidden="true"><use href="#sheet"/></svg></span><strong>カットがここに並びます</strong><p>動画を読み込んだら、各カットの右側にナレーションや歌詞などを書き込めます。</p></div>
 <div id="cuts"></div>
 </section>
@@ -160,6 +172,61 @@ function clock(value) {
   const pad = number => String(number).padStart(2, '0');
   return (h ? pad(h) + ':' : '') + pad(min) + ':' + pad(sec) + '.' + tenths % 10;
 }
+function noteSize() {
+  const value = byId('note-size').valueAsNumber;
+  return Number.isFinite(value) ? Math.min(32, Math.max(8, Math.round(value))) : 16;
+}
+function updateSheetOptions() {
+  const showTime = byId('show-time').checked;
+  byId('sheet').classList.toggle('hide-time', !showTime);
+  byId('time-hint').hidden = !showTime;
+  byId('sheet').style.setProperty('--note-size', (noteSize() * .25) + 'mm');
+}
+byId('show-time').onchange = updateSheetOptions;
+byId('note-size').oninput = updateSheetOptions;
+byId('note-size').onchange = () => {
+  byId('note-size').value = noteSize();
+  updateSheetOptions();
+};
+function displayedTiming(cut, next) {
+  return {
+    start: cut.displayStart ?? cut.start,
+    length: cut.displayLength ?? next - cut.start
+  };
+}
+function parseTime(value, allowClock) {
+  const parts = value.normalize('NFKC').replace(',', '.').split(':');
+  if ((!allowClock && parts.length > 1) || parts.length > 3) return NaN;
+  const last = parts.pop();
+  if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(last) || parts.some(part => !/^\d+$/.test(part))) return NaN;
+  const units = [...parts, last].map(Number);
+  if (units.slice(1).some(unit => unit >= 60)) return NaN;
+  return units.reduce((total, unit) => total * 60 + unit, 0);
+}
+function editTiming(input, cut, next, index, isStart) {
+  const key = isStart ? 'displayStart' : 'displayLength';
+  const label = isStart ? '開始時刻' : '秒数';
+  const format = () => {
+    const timing = displayedTiming(cut, next);
+    return isStart ? clock(timing.start) : timing.length.toFixed(1);
+  };
+  input.setAttribute('aria-label', 'カット ' + cutNo(index) + ' の' + label);
+  input.value = format();
+  input.onchange = () => {
+    const raw = input.value.trim();
+    const value = parseTime(raw, isStart);
+    if (!raw) {
+      delete cut[key];
+      error();
+    } else if (Number.isFinite(value) && value <= 359999.9) {
+      cut[key] = value;
+      error();
+    } else {
+      error(label + 'を確認してください。' + (isStart ? '秒数または 01:23.4 の形式で入力できます。' : '0以上の秒数を入力できます。'));
+    }
+    input.value = format();
+  };
+}
 function error(message = '') {
   byId('error').textContent = message;
   byId('error').hidden = !message;
@@ -169,7 +236,7 @@ function refresh() {
   const loaded = Boolean(state.file);
   for (const id of ['replace', 'tools', 'video']) byId(id).hidden = !loaded;
   byId('pick').hidden = loaded;
-  for (const id of ['pick', 'replace', 'add', 'sensitivity', 'scan', 'sheet-title', 'speech-language']) byId(id).disabled = busy;
+  for (const id of ['pick', 'replace', 'add', 'sensitivity', 'scan', 'sheet-title', 'speech-language', 'show-time', 'note-size']) byId(id).disabled = busy;
   byId('transcribe').disabled = busy || !state.cuts.length;
   byId('pdf').disabled = busy || !state.cuts.length;
   byId('progress-box').hidden = !busy;
@@ -181,7 +248,7 @@ function refresh() {
   byId('count').textContent = state.cuts.length + ' CUTS';
   byId('empty').hidden = Boolean(state.cuts.length);
   for (const button of list.querySelectorAll('.icon-button')) button.disabled = busy;
-  for (const note of list.querySelectorAll('textarea')) note.readOnly = busy;
+  for (const field of list.querySelectorAll('textarea, .timing input')) field.readOnly = busy;
 }
 function markActive() {
   const index = state.cuts.findLastIndex(cut => cut.start <= video.currentTime + .015);
@@ -195,7 +262,10 @@ function render() {
     row.className = 'cut';
     row.innerHTML = `
       <button type="button" class="preview"><img alt=""><span class="serial"></span></button>
-      <div><div class="length"></div><div class="clock"></div></div>
+      <div class="timing">
+        <label>秒数<input class="length" type="text" inputmode="decimal" maxlength="12"></label>
+        <label>開始<input class="clock" type="text" maxlength="12"></label>
+      </div>
       <textarea rows="3" placeholder="ナレーション、歌詞、BGM など"></textarea>
       <button type="button" class="icon-button"><svg aria-hidden="true"><use href="#trash"/></svg></button>`;
     const preview = row.querySelector('.preview');
@@ -203,8 +273,8 @@ function render() {
     preview.onclick = () => { video.currentTime = cut.start; };
     row.querySelector('img').src = cut.image;
     row.querySelector('.serial').textContent = 'CUT ' + cutNo(index);
-    row.querySelector('.length').textContent = seconds(next - cut.start);
-    row.querySelector('.clock').textContent = clock(cut.start);
+    editTiming(row.querySelector('.length'), cut, next, index, false);
+    editTiming(row.querySelector('.clock'), cut, next, index, true);
     const note = row.querySelector('textarea');
     note.setAttribute('aria-label', 'カット ' + cutNo(index) + ' の音声メモ');
     note.value = cut.note;
@@ -731,8 +801,11 @@ function jpegBytes(canvas) {
 async function makePdf() {
   const canvas = document.createElement('canvas');
   const width = 794, height = 1123, left = 39, right = 755, bottom = 1057;
-  const numberX = left + 10, imageX = 99, timeX = 278, audioX = 390;
-  const imageWidth = 161, imageHeight = 86, lineHeight = 21, baseRow = 100;
+  const showTime = byId('show-time').checked;
+  const numberX = left + 10, imageX = 99, timeX = 278, audioX = showTime ? 390 : timeX;
+  const audioFont = noteSize() * .25 * width / 210;
+  const lineHeight = Math.ceil(audioFont * 1.35);
+  const imageWidth = 161, imageHeight = 86, baseRow = 100;
   canvas.width = width * 2;
   canvas.height = height * 2;
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -756,21 +829,23 @@ async function makePdf() {
   const plan = [[]];
   let y = firstRow;
   for (const [index, cut] of state.cuts.entries()) {
-    setFont(15);
+    setFont(audioFont);
     const lines = wrapText(ctx, cut.note, right - audioX - 10);
-    const start = cut.start;
-    const end = state.cuts[index + 1]?.start ?? state.duration;
+    const next = state.cuts[index + 1]?.start ?? state.duration;
+    const { start, length } = displayedTiming(cut, next);
     let offset = 0;
     while (offset < lines.length) {
       const rowHeight = Math.max(baseRow, lines.length * lineHeight + 22);
-      if (offset === 0 && y !== firstRow && y + rowHeight > bottom) {
+      const space = bottom - y;
+      if (offset === 0 && y !== firstRow && rowHeight > space
+        && (rowHeight <= bottom - firstRow || space < baseRow)) {
         plan.push([]);
         y = firstRow;
       }
       const take = Math.min(lines.length - offset, Math.floor((bottom - y - 22) / lineHeight));
       if (take < 1) throw new Error('Page header leaves no room for notes');
       const row = Math.max(offset ? 62 : baseRow, take * lineHeight + 22);
-      plan.at(-1).push({ cut, index, start, end, lines: lines.slice(offset, offset + take), y, row, continued: offset > 0 });
+      plan.at(-1).push({ cut, index, start, length, lines: lines.slice(offset, offset + take), y, row, continued: offset > 0 });
       offset += take;
       y += row;
       if (offset < lines.length) { plan.push([]); y = firstRow; }
@@ -787,10 +862,10 @@ async function makePdf() {
     ctx.fillRect(left, header, right - left, 34);
     write('No.', numberX, header + 22, 13, colors.ink, 700);
     write('キャプチャー', imageX, header + 22, 13, colors.ink, 700);
-    write('秒数・開始', timeX, header + 22, 13, colors.ink, 700);
+    if (showTime) write('秒数・開始', timeX, header + 22, 13, colors.ink, 700);
     write('音声メモ', audioX, header + 22, 13, colors.ink, 700);
     for (const entry of rows) {
-      const { cut, start, end, continued, y, row } = entry;
+      const { cut, start, length, continued, y, row } = entry;
       write(cutNo(entry.index), numberX, y + 26, 13, colors.green, 700);
       if (!continued) {
         const img = new Image();
@@ -801,12 +876,14 @@ async function makePdf() {
         ctx.fillStyle = '#18251e';
         ctx.fillRect(imageX, y + 7, imageWidth, imageHeight);
         ctx.drawImage(img, imageX + (imageWidth - w) / 2, y + 7 + (imageHeight - h) / 2, w, h);
-        write(seconds(end - start), timeX, y + 26, 16, colors.ink, 700);
-        write(clock(start), timeX, y + 46, 13, colors.muted);
+        if (showTime) {
+          write(seconds(length), timeX, y + 26, 16, colors.ink, 700);
+          write(clock(start), timeX, y + 46, 13, colors.muted);
+        }
       } else {
         write('続き', imageX, y + 26, 13, colors.green, 700);
       }
-      entry.lines.forEach((line, i) => write(line, audioX, y + 25 + i * lineHeight, 15));
+      entry.lines.forEach((line, i) => write(line, audioX, y + 10 + audioFont + i * lineHeight, audioFont));
       rule(y + row);
     }
     rule(1072);
@@ -828,6 +905,7 @@ byId('pdf').onclick = () => run('PDFを作成中…', async () => {
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }, 'PDFの作成に失敗しました。もう一度お試しください。', false);
+updateSheetOptions();
 refresh();
 </script>
 </body>

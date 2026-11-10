@@ -56,6 +56,9 @@ video{display:block;width:100%;aspect-ratio:16/9;object-fit:contain;background:#
 .tools{display:grid;gap:9px;margin-top:12px}
 .settings{display:flex;align-items:center;gap:8px}
 .settings label{font-size:11px;color:var(--muted);flex:1}
+.transcription{display:grid;gap:6px;margin-top:6px;padding-top:12px;border-top:1px solid var(--line)}
+.transcription .settings{flex-wrap:wrap}
+.transcription-result{color:var(--green);font-size:12px;font-weight:700}
 select{border:1px solid var(--line);border-radius:6px;background:var(--white);padding:6px 8px;font-size:12px}
 .progress{display:grid;gap:7px;padding:12px 16px;background:var(--pale);border-top:1px solid var(--line)}
 .progress div{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:12px}
@@ -118,6 +121,12 @@ footer svg{height:13px;width:13px}
 <button class="button" id="add" type="button"><svg aria-hidden="true"><use href="#plus"/></svg>再生位置にカットを追加</button>
 <div class="settings"><label for="sensitivity">検出感度</label><select id="sensitivity"><option value=".32">低め</option><option value=".23" selected>標準</option><option value=".15">高め</option></select><button class="button" type="button" id="scan">再検出</button></div>
 <p class="hint">再検出では現在のカットと音声メモを置き換えます。</p>
+<div class="transcription">
+<div class="settings"><label for="speech-language">音声の言語</label><select id="speech-language"><option value="japanese">日本語</option><option value="">自動判定</option><option value="english">英語</option></select></div>
+<button class="button" id="transcribe" type="button">音声を自動入力</button>
+<p class="hint">空欄の音声メモに文字起こしを入れます。初回は認識モデルのダウンロードが必要です。</p>
+<p class="transcription-result" id="transcription-result" role="status"></p>
+</div>
 </div></div>
 <div class="progress" id="progress-box" hidden><div><span id="status" role="status"></span><button type="button" class="button" id="cancel">中止</button></div><progress id="progress" aria-label="処理の進行状況" max="100"></progress></div>
 </section>
@@ -160,7 +169,8 @@ function refresh() {
   const loaded = Boolean(state.file);
   for (const id of ['replace', 'tools', 'video']) byId(id).hidden = !loaded;
   byId('pick').hidden = loaded;
-  for (const id of ['pick', 'replace', 'add', 'sensitivity', 'scan', 'sheet-title']) byId(id).disabled = busy;
+  for (const id of ['pick', 'replace', 'add', 'sensitivity', 'scan', 'sheet-title', 'speech-language']) byId(id).disabled = busy;
+  byId('transcribe').disabled = busy || !state.cuts.length;
   byId('pdf').disabled = busy || !state.cuts.length;
   byId('progress-box').hidden = !busy;
   byId('cancel').hidden = busy && !state.task.controller;
@@ -484,6 +494,7 @@ function openFile(file) {
       }));
       if (state.url) URL.revokeObjectURL(state.url);
       Object.assign(state, { file, url, ...result });
+      byId('transcription-result').textContent = '';
       video.src = url;
       render();
     } finally {
@@ -516,6 +527,7 @@ byId('scan').onclick = () => {
   if (state.cuts.some(cut => cut.note.trim()) && !confirm('再検出すると、現在の音声メモが消えます。続けますか？')) return;
   run('動画を読み込み中…', async signal => {
     state.cuts = await withReader(state.url, signal, reader => detect(reader, signal));
+    byId('transcription-result').textContent = '';
     render();
   }, '再検出できませんでした。現在のカットは保持されています。');
 };
@@ -537,6 +549,121 @@ byId('add').onclick = () => {
     render();
     list.children[insertion]?.querySelector('textarea').focus();
   }, 'この位置の画像を取得できませんでした。');
+};
+async function readSpeechAudio(file, signal) {
+  const decoder = new OfflineAudioContext(1, 1, 16000);
+  const bytes = await file.arrayBuffer();
+  signal.throwIfAborted();
+  const decoded = await decoder.decodeAudioData(bytes);
+  signal.throwIfAborted();
+  if (decoded.numberOfChannels === 1) return decoded.getChannelData(0);
+  const mono = new Float32Array(decoded.length);
+  for (let channel = 0; channel < decoded.numberOfChannels; channel++) {
+    const samples = decoded.getChannelData(channel);
+    for (let i = 0; i < samples.length; i++) mono[i] += samples[i] / decoded.numberOfChannels;
+  }
+  return mono;
+}
+function speechWorker() {
+  self.onmessage = async ({ data: { audio, language } }) => {
+    try {
+      const { env, pipeline } = await import(
+        'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/dist/transformers.min.js'
+      );
+      env.allowLocalModels = false;
+      env.backends.onnx.wasm.numThreads = 1;
+      const recognize = await pipeline('automatic-speech-recognition', 'onnx-community/whisper-base_timestamped', {
+        device: 'wasm',
+        dtype: 'q8'
+      });
+      self.postMessage({ type: 'recognizing' });
+      const result = await recognize(audio, {
+        task: 'transcribe',
+        ...(language ? { language } : {}),
+        chunk_length_s: 25,
+        stride_length_s: 4,
+        return_timestamps: 'word'
+      });
+      self.postMessage({ type: 'result', chunks: result.chunks ?? [] });
+    } catch (err) {
+      self.postMessage({ type: 'error', message: String(err) });
+    }
+  };
+}
+async function recognizeSpeech(audio, language, signal) {
+  const source = '(' + speechWorker.toString() + ')();';
+  const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
+  let worker;
+  let abort;
+  try {
+    worker = new Worker(url, { type: 'module' });
+    return await new Promise((resolve, reject) => {
+      signal.throwIfAborted();
+      abort = () => reject(signal.reason);
+      signal.addEventListener('abort', abort, { once: true });
+      worker.onerror = event => reject(new Error(event.message || 'Speech worker failed'));
+      worker.onmessage = ({ data }) => {
+        if (data.type === 'recognizing') progress('文字起こし中…');
+        if (data.type === 'result') resolve(data.chunks);
+        if (data.type === 'error') reject(new Error(data.message));
+      };
+      worker.postMessage({ audio, language }, [audio.buffer]);
+    });
+  } finally {
+    if (abort) signal.removeEventListener('abort', abort);
+    worker?.terminate();
+    URL.revokeObjectURL(url);
+  }
+}
+function fillSpeechNotes(cuts, chunks) {
+  const notes = cuts.map(() => []);
+  for (const { timestamp, text } of chunks) {
+    const [start, end] = timestamp ?? [];
+    if (!Number.isFinite(start) || !text?.trim()) continue;
+    const time = Number.isFinite(end) ? (start + end) / 2 : start;
+    const index = cuts.findLastIndex(cut => cut.start <= time);
+    if (index !== -1) notes[index].push(text);
+  }
+  let filled = 0;
+  for (const [index, cut] of cuts.entries()) {
+    const note = notes[index].join('').trim();
+    if (note && !cut.note.trim()) {
+      cut.note = note;
+      filled++;
+    }
+  }
+  return { filled, heard: notes.some(parts => parts.length) };
+}
+byId('transcribe').onclick = () => {
+  const result = byId('transcription-result');
+  if (state.cuts.every(cut => cut.note.trim())) {
+    result.textContent = 'すべてのカットに音声メモが入力されています。';
+    return;
+  }
+  result.textContent = '';
+  run('動画の音声を読み込み中…', async signal => {
+    let audio;
+    try {
+      audio = await readSpeechAudio(state.file, signal);
+    } catch (err) {
+      signal.throwIfAborted();
+      console.error(err);
+      error('音声を読み込めませんでした。音声トラックのある MP4（AAC）などをお試しください。');
+      return;
+    }
+    if (!audio.some(sample => Math.abs(sample) > .001)) {
+      result.textContent = '音声が無音のため、入力する内容はありませんでした。';
+      return;
+    }
+    progress('音声認識モデルを準備中…');
+    const chunks = await recognizeSpeech(audio, byId('speech-language').value, signal);
+    signal.throwIfAborted();
+    const { filled, heard } = fillSpeechNotes(state.cuts, chunks);
+    render();
+    result.textContent = filled ? filled + ' カットの音声メモを入力しました。'
+      : heard ? '空欄のカットに該当する発話はありませんでした。'
+        : '文字起こしできる発話が見つかりませんでした。';
+  }, '文字起こしに失敗しました。ネット接続を確認し、もう一度お試しください。');
 };
 function wrapText(ctx, text, width) {
   const lines = [];

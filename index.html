@@ -137,7 +137,7 @@ footer svg{height:13px;width:13px}
 </div></div>
 <div class="progress" id="progress-box" hidden><div><span id="status" role="status"></span><button type="button" class="button" id="cancel">中止</button></div><progress id="progress" aria-label="処理の進行状況" max="100"></progress></div>
 </section>
-<section class="card sheet" id="sheet" aria-labelledby="sheet-heading">
+<section class="card sheet" id="sheet-panel" aria-labelledby="sheet-heading">
 <div class="cardhead"><h2 id="sheet-heading"><svg aria-hidden="true"><use href="#sheet"/></svg>カット一覧</h2><span id="count" class="badge">0 CUTS</span></div>
 <div class="sheet-title">
 <label for="sheet-title">カットシートのタイトル</label>
@@ -178,9 +178,9 @@ function noteSize() {
 }
 function updateSheetOptions() {
   const showTime = byId('show-time').checked;
-  byId('sheet').classList.toggle('hide-time', !showTime);
+  byId('sheet-panel').classList.toggle('hide-time', !showTime);
   byId('time-hint').hidden = !showTime;
-  byId('sheet').style.setProperty('--note-size', (noteSize() * .25) + 'mm');
+  byId('sheet-panel').style.setProperty('--note-size', (noteSize() * .25) + 'mm');
 }
 byId('show-time').onchange = updateSheetOptions;
 byId('note-size').oninput = updateSheetOptions;

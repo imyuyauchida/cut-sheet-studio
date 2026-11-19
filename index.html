@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#f7f8f4">
 <title>カットシート・スタジオ</title>
-<meta name="description" content="動画からカットを抽出し、音声メモ付きのA4カットシートを作成できます。">
+<meta name="description" content="動画からカットを抽出し、音声付きのA4カットシートを作成できます。">
 <style>
 :root{color-scheme:light;--bg:#f7f8f4;--white:#fff;--ink:#19241e;--muted:#56645b;--line:#dce2da;--green:#175641;--pale:#eaf3ec;--dark:#18251e;--lime:#d9ed9d;--mono:ui-monospace,SFMono-Regular,Menlo,monospace;--sans:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",Meiryo,sans-serif}
 *{box-sizing:border-box}
@@ -76,6 +76,8 @@ progress{accent-color:var(--green);width:100%;height:8px}
 .columns,.cut{display:grid;grid-template-columns:minmax(112px,1.15fr) minmax(82px,.65fr) minmax(122px,1.65fr) 28px;column-gap:12px}
 .sheet.hide-time .timing{display:none}
 .sheet.hide-time .columns,.sheet.hide-time .cut{grid-template-columns:minmax(112px,1.15fr) minmax(122px,2.3fr) 28px}
+.columns input{width:100%;min-width:0;font:inherit;padding:3px 4px;border:1px solid transparent;border-radius:4px;background:transparent}
+.columns input:hover,.columns input:focus{background:white;border-color:var(--line)}
 .columns{background:#f0f3ee;color:var(--muted);padding:8px 16px;border-bottom:1px solid var(--line);font-size:11px;font-weight:700}
 .empty{display:grid;justify-items:center;align-content:center;text-align:center;min-height:275px;padding:24px;color:var(--muted)}
 .empty-icon{display:grid;place-items:center;width:48px;height:48px;background:var(--pale);color:var(--green);border-radius:10px;margin-bottom:13px}
@@ -119,7 +121,7 @@ footer svg{height:13px;width:13px}
 </svg>
 <header><div class="top"><div class="brand"><span class="logo"><svg aria-hidden="true"><use href="#film"/></svg></span>カットシート・スタジオ</div><span class="badge">A4 / PORTRAIT</span></div></header>
 <main class="wrap">
-<section class="intro"><div><p class="eyebrow">VIDEO WORKSPACE</p><h1>カットシートを作成 <small class="version">v1.2</small></h1><p>映像のカットと音声メモを、1枚ずつ見返せる資料に。</p></div><button class="button primary" id="pdf" disabled><svg aria-hidden="true"><use href="#download"/></svg>PDFをダウンロード</button></section>
+<section class="intro"><div><p class="eyebrow">VIDEO WORKSPACE</p><h1>カットシートを作成 <small class="version">v1.2</small></h1><p>映像のカットと音声を、1枚ずつ見返せる資料に。</p></div><button class="button primary" id="pdf" disabled><svg aria-hidden="true"><use href="#download"/></svg>PDFをダウンロード</button></section>
 <p id="error" class="alert" role="alert" hidden></p>
 <div class="workspace">
 <section class="card source" id="source" aria-labelledby="source-heading">
@@ -131,11 +133,11 @@ footer svg{height:13px;width:13px}
 <div class="tools" id="tools" hidden>
 <button class="button" id="add" type="button"><svg aria-hidden="true"><use href="#plus"/></svg>再生位置にカットを追加</button>
 <div class="settings"><label for="sensitivity">検出感度</label><select id="sensitivity"><option value=".32">低め</option><option value=".23" selected>標準</option><option value=".15">高め</option></select><button class="button" type="button" id="scan">再検出</button></div>
-<p class="hint">再検出では現在のカットと音声メモを置き換えます。</p>
+<p class="hint">再検出では現在のカットと音声を置き換えます。</p>
 <div class="transcription">
 <div class="settings"><label for="speech-language">音声の言語</label><select id="speech-language"><option value="japanese">日本語</option><option value="">自動判定</option><option value="english">英語</option></select></div>
 <button class="button" id="transcribe" type="button">音声を自動入力</button>
-<p class="hint">空欄の音声メモに文字起こしを入れます。初回は認識モデルのダウンロードが必要です。</p>
+<p class="hint">空欄の音声に文字起こしを入れます。初回は認識モデルのダウンロードが必要です。</p>
 <p class="transcription-result" id="transcription-result" role="status"></p>
 </div>
 </div></div>
@@ -148,17 +150,22 @@ footer svg{height:13px;width:13px}
 <input id="sheet-title" type="text" maxlength="160" placeholder="空欄の場合は映像のファイル名を表示">
 </div>
 <div class="sheet-options">
-<label><input type="checkbox" id="show-time" checked>秒数・開始</label>
-<label><input type="checkbox" id="remarks-mode">備考に切り替え</label>
-<label>音声メモの級数 <input id="note-size" type="number" min="8" max="32" step="1" value="16"> Q</label>
+<button type="button" class="button" id="column-mode" aria-pressed="false">備考に切り替え</button>
+<label>音声の級数 <input id="note-size" type="number" min="8" max="32" step="1" value="16"> Q</label>
 <p class="hint" id="time-hint">秒数と開始時刻は表示・PDF用の値です。空欄にすると自動値に戻ります。</p>
 </div>
-<div class="columns" aria-hidden="true"><span>キャプチャー</span><span class="timing" id="timing-heading">秒数・開始</span><span>音声メモ</span><span></span></div>
+<div class="columns">
+<input id="capture-heading" aria-label="キャプチャーの項目名" maxlength="24" value="キャプチャー">
+<div class="timing">
+<input id="time-heading" aria-label="秒数・開始の項目名" maxlength="24" value="秒数・開始">
+<input id="remarks-heading" aria-label="備考の項目名" maxlength="24" value="備考" hidden>
+</div>
+<input id="audio-heading" aria-label="音声の項目名" maxlength="24" value="音声"><span></span></div>
 <div class="empty" id="empty"><span class="empty-icon"><svg aria-hidden="true"><use href="#sheet"/></svg></span><strong>カットがここに並びます</strong><p>動画を読み込んだら、各カットの右側にナレーションや歌詞などを書き込めます。</p></div>
 <div id="cuts"></div>
 </section>
 </div>
-<footer><svg aria-hidden="true"><use href="#lock"/></svg>動画と音声メモはブラウザ内で処理されます。</footer>
+<footer><svg aria-hidden="true"><use href="#lock"/></svg>動画と音声はブラウザ内で処理されます。</footer>
 </main>
 <script>
 'use strict';
@@ -181,17 +188,23 @@ function noteSize() {
   const value = byId('note-size').valueAsNumber;
   return Number.isFinite(value) ? Math.min(32, Math.max(8, Math.round(value))) : 16;
 }
+function columnTitle(id, fallback) {
+  return byId(id).value.trim() || fallback;
+}
 function updateSheetOptions() {
-  const showTime = byId('show-time').checked;
-  byId('sheet-panel').classList.toggle('hide-time', !showTime);
-  const remarks = byId('remarks-mode').checked;
+  const remarks = byId('column-mode').getAttribute('aria-pressed') === 'true';
   byId('sheet-panel').classList.toggle('remarks-mode', remarks);
-  byId('timing-heading').textContent = remarks ? '備考' : '秒数・開始';
-  byId('time-hint').hidden = !showTime || remarks;
+  byId('time-heading').hidden = remarks;
+  byId('remarks-heading').hidden = !remarks;
+  byId('column-mode').textContent = remarks ? '秒数・開始に切り替え' : '備考に切り替え';
+  byId('time-hint').hidden = remarks;
   byId('sheet-panel').style.setProperty('--note-size', (noteSize() * .25) + 'mm');
 }
-byId('show-time').onchange = updateSheetOptions;
-byId('remarks-mode').onchange = updateSheetOptions;
+byId('column-mode').onclick = () => {
+  const button = byId('column-mode');
+  button.setAttribute('aria-pressed', String(button.getAttribute('aria-pressed') !== 'true'));
+  updateSheetOptions();
+};
 byId('note-size').oninput = updateSheetOptions;
 byId('note-size').onchange = () => {
   byId('note-size').value = noteSize();
@@ -245,7 +258,7 @@ function refresh() {
   const loaded = Boolean(state.file);
   for (const id of ['replace', 'tools', 'video']) byId(id).hidden = !loaded;
   byId('pick').hidden = loaded;
-  for (const id of ['pick', 'replace', 'add', 'sensitivity', 'scan', 'sheet-title', 'speech-language', 'show-time', 'note-size', 'remarks-mode']) byId(id).disabled = busy;
+  for (const id of ['pick', 'replace', 'add', 'sensitivity', 'scan', 'sheet-title', 'speech-language', 'column-mode', 'note-size', 'capture-heading', 'time-heading', 'remarks-heading', 'audio-heading']) byId(id).disabled = busy;
   byId('transcribe').disabled = busy || !state.cuts.length;
   byId('pdf').disabled = busy || !state.cuts.length;
   byId('progress-box').hidden = !busy;
@@ -290,7 +303,7 @@ function render() {
     remarks.value = cut.remarks ?? '';
     remarks.oninput = () => { cut.remarks = remarks.value; };
     const note = row.querySelector('textarea:not(.remarks)');
-    note.setAttribute('aria-label', 'カット ' + cutNo(index) + ' の音声メモ');
+    note.setAttribute('aria-label', 'カット ' + cutNo(index) + ' の音声');
     note.value = cut.note;
     note.addEventListener('input', () => { cut.note = note.value; });
     const remove = row.querySelector('.icon-button');
@@ -564,7 +577,7 @@ async function detect(reader, signal) {
 }
 function openFile(file) {
   if (!file || state.task) return;
-  if (state.cuts.some(cut => cut.note.trim()) && !confirm('動画を変更すると、現在の音声メモが消えます。変更しますか？')) return;
+  if (state.cuts.some(cut => cut.note.trim()) && !confirm('動画を変更すると、現在の音声が消えます。変更しますか？')) return;
   run('動画を読み込み中…', async signal => {
     const url = URL.createObjectURL(file);
     try {
@@ -604,7 +617,7 @@ byId('source').addEventListener('drop', event => {
   openFile(event.dataTransfer.files[0]);
 });
 byId('scan').onclick = () => {
-  if (state.cuts.some(cut => cut.note.trim()) && !confirm('再検出すると、現在の音声メモが消えます。続けますか？')) return;
+  if (state.cuts.some(cut => cut.note.trim()) && !confirm('再検出すると、現在の音声が消えます。続けますか？')) return;
   run('動画を読み込み中…', async signal => {
     state.cuts = await withReader(state.url, signal, reader => detect(reader, signal));
     byId('transcription-result').textContent = '';
@@ -724,7 +737,7 @@ function fillSpeechNotes(cuts, chunks) {
 byId('transcribe').onclick = () => {
   const result = byId('transcription-result');
   if (state.cuts.every(cut => cut.note.trim())) {
-    result.textContent = 'すべてのカットに音声メモが入力されています。';
+    result.textContent = 'すべてのカットに音声が入力されています。';
     return;
   }
   result.textContent = '';
@@ -747,7 +760,7 @@ byId('transcribe').onclick = () => {
     signal.throwIfAborted();
     const { filled, heard } = fillSpeechNotes(state.cuts, chunks);
     render();
-    result.textContent = filled ? filled + ' カットの音声メモを入力しました。'
+    result.textContent = filled ? filled + ' カットの音声を入力しました。'
       : heard ? '空欄のカットに該当する発話はありませんでした。'
         : '文字起こしできる発話が見つかりませんでした。';
   }, '文字起こしに失敗しました。ネット接続を確認し、もう一度お試しください。');
@@ -818,9 +831,8 @@ function jpegBytes(canvas) {
 async function makePdf() {
   const canvas = document.createElement('canvas');
   const width = 794, height = 1123, left = 39, right = 755, bottom = 1057;
-  const showTime = byId('show-time').checked;
-  const remarksMode = byId('remarks-mode').checked;
-  const numberX = left + 10, imageX = 99, timeX = 278, audioX = showTime ? 420 : timeX;
+  const remarksMode = byId('column-mode').getAttribute('aria-pressed') === 'true';
+  const numberX = left + 10, imageX = 99, timeX = 278, audioX = 420;
   const audioFont = noteSize() * .25 * width / 210;
   const lineHeight = Math.ceil(audioFont * 1.35);
   const imageWidth = 161, imageHeight = 86, baseRow = 100;
@@ -849,7 +861,7 @@ async function makePdf() {
   for (const [index, cut] of state.cuts.entries()) {
     setFont(audioFont);
     const lines = wrapText(ctx, cut.note, right - audioX - 10);
-    const remarksLines = showTime && remarksMode ? wrapText(ctx, cut.remarks ?? '', audioX - timeX - 12) : [];
+    const remarksLines = remarksMode ? wrapText(ctx, cut.remarks ?? '', audioX - timeX - 12) : [];
     const totalLines = Math.max(lines.length, remarksLines.length);
     const next = state.cuts[index + 1]?.start ?? state.duration;
     const { start, length } = displayedTiming(cut, next);
@@ -880,10 +892,15 @@ async function makePdf() {
     write('カットシート  /  ' + state.cuts.length + ' カット  /  全体 ' + clock(state.duration), left, header - 14, 13, colors.green, 700);
     ctx.fillStyle = '#eaf1ea';
     ctx.fillRect(left, header, right - left, 34);
+    function writeHeading(text, x, availableWidth) {
+      setFont(13, 700);
+      const size = Math.min(13, 13 * availableWidth / Math.max(1, ctx.measureText(text).width));
+      write(text, x, header + 22, size, colors.ink, 700);
+    }
     write('No.', numberX, header + 22, 13, colors.ink, 700);
-    write('キャプチャー', imageX, header + 22, 13, colors.ink, 700);
-    if (showTime) write(remarksMode ? '備考' : '秒数・開始', timeX, header + 22, 13, colors.ink, 700);
-    write('音声メモ', audioX, header + 22, 13, colors.ink, 700);
+    writeHeading(columnTitle('capture-heading', 'キャプチャー'), imageX, imageWidth);
+    writeHeading(remarksMode ? columnTitle('remarks-heading', '備考') : columnTitle('time-heading', '秒数・開始'), timeX, audioX - timeX - 12);
+    writeHeading(columnTitle('audio-heading', '音声'), audioX, right - audioX - 10);
     for (const entry of rows) {
       const { cut, start, length, continued, y, row } = entry;
       write(cutNo(entry.index), numberX, y + 26, 13, colors.green, 700);
@@ -896,7 +913,7 @@ async function makePdf() {
         ctx.fillStyle = '#18251e';
         ctx.fillRect(imageX, y + 7, imageWidth, imageHeight);
         ctx.drawImage(img, imageX + (imageWidth - w) / 2, y + 7 + (imageHeight - h) / 2, w, h);
-        if (showTime && !remarksMode) {
+        if (!remarksMode) {
           write(seconds(length), timeX, y + 26, 16, colors.ink, 700);
           write(clock(start), timeX, y + 46, 13, colors.muted);
         }

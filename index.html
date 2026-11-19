@@ -27,6 +27,7 @@ header{background:var(--white);border-bottom:1px solid var(--line)}
 .eyebrow{color:var(--green);font-size:11px;font-weight:750;letter-spacing:.15em;margin:0 0 9px;display:flex;align-items:center;gap:8px}
 .eyebrow:before{content:"";background:#5b9368;width:7px;height:7px;border-radius:50%}
 h1,h2,p{margin:0}
+.version{display:inline-block;font:500 12px var(--mono);letter-spacing:0;color:var(--muted);vertical-align:middle}
 h1{font-size:clamp(29px,4vw,44px);font-weight:770;letter-spacing:-.055em;line-height:1.25}
 .intro p:last-child{margin-top:10px;color:var(--muted)}
 .button{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line);background:white;border-radius:7px;padding:8px 12px;font-weight:700;font-size:12px;min-height:37px;white-space:nowrap}
@@ -87,6 +88,9 @@ progress{accent-color:var(--green);width:100%;height:8px}
 .preview{padding:0;text-align:left;border:0;background:none;min-width:0}
 .preview img{display:block;width:100%;aspect-ratio:16/9;object-fit:contain;background:#162019;border-radius:5px}
 .serial{display:block;font-size:10px;margin-top:4px;color:var(--green);font-weight:700}
+.timing .remarks{display:none;font-size:var(--note-size, 4mm)}
+.remarks-mode .timing label{display:none}
+.remarks-mode .timing .remarks{display:block}
 .timing label{display:block;color:var(--muted);font-size:10px}
 .timing label+label{margin-top:4px}
 .timing input{display:block;width:100%;min-width:0;padding:3px 4px;border:1px solid var(--line);border-radius:5px;background:var(--white);font-family:var(--mono);font-size:11px}
@@ -115,7 +119,7 @@ footer svg{height:13px;width:13px}
 </svg>
 <header><div class="top"><div class="brand"><span class="logo"><svg aria-hidden="true"><use href="#film"/></svg></span>カットシート・スタジオ</div><span class="badge">A4 / PORTRAIT</span></div></header>
 <main class="wrap">
-<section class="intro"><div><p class="eyebrow">VIDEO WORKSPACE</p><h1>カットシートを作成</h1><p>映像のカットと音声メモを、1枚ずつ見返せる資料に。</p></div><button class="button primary" id="pdf" disabled><svg aria-hidden="true"><use href="#download"/></svg>PDFをダウンロード</button></section>
+<section class="intro"><div><p class="eyebrow">VIDEO WORKSPACE</p><h1>カットシートを作成 <small class="version">v1.2</small></h1><p>映像のカットと音声メモを、1枚ずつ見返せる資料に。</p></div><button class="button primary" id="pdf" disabled><svg aria-hidden="true"><use href="#download"/></svg>PDFをダウンロード</button></section>
 <p id="error" class="alert" role="alert" hidden></p>
 <div class="workspace">
 <section class="card source" id="source" aria-labelledby="source-heading">
@@ -144,11 +148,12 @@ footer svg{height:13px;width:13px}
 <input id="sheet-title" type="text" maxlength="160" placeholder="空欄の場合は映像のファイル名を表示">
 </div>
 <div class="sheet-options">
-<label><input type="checkbox" id="show-time" checked>秒数・開始を表示</label>
+<label><input type="checkbox" id="show-time" checked>秒数・開始</label>
+<label><input type="checkbox" id="remarks-mode">備考に切り替え</label>
 <label>音声メモの級数 <input id="note-size" type="number" min="8" max="32" step="1" value="16"> Q</label>
 <p class="hint" id="time-hint">秒数と開始時刻は表示・PDF用の値です。空欄にすると自動値に戻ります。</p>
 </div>
-<div class="columns" aria-hidden="true"><span>キャプチャー</span><span class="timing">秒数・開始</span><span>音声メモ</span><span></span></div>
+<div class="columns" aria-hidden="true"><span>キャプチャー</span><span class="timing" id="timing-heading">秒数・開始</span><span>音声メモ</span><span></span></div>
 <div class="empty" id="empty"><span class="empty-icon"><svg aria-hidden="true"><use href="#sheet"/></svg></span><strong>カットがここに並びます</strong><p>動画を読み込んだら、各カットの右側にナレーションや歌詞などを書き込めます。</p></div>
 <div id="cuts"></div>
 </section>
@@ -179,10 +184,14 @@ function noteSize() {
 function updateSheetOptions() {
   const showTime = byId('show-time').checked;
   byId('sheet-panel').classList.toggle('hide-time', !showTime);
-  byId('time-hint').hidden = !showTime;
+  const remarks = byId('remarks-mode').checked;
+  byId('sheet-panel').classList.toggle('remarks-mode', remarks);
+  byId('timing-heading').textContent = remarks ? '備考' : '秒数・開始';
+  byId('time-hint').hidden = !showTime || remarks;
   byId('sheet-panel').style.setProperty('--note-size', (noteSize() * .25) + 'mm');
 }
 byId('show-time').onchange = updateSheetOptions;
+byId('remarks-mode').onchange = updateSheetOptions;
 byId('note-size').oninput = updateSheetOptions;
 byId('note-size').onchange = () => {
   byId('note-size').value = noteSize();
@@ -236,7 +245,7 @@ function refresh() {
   const loaded = Boolean(state.file);
   for (const id of ['replace', 'tools', 'video']) byId(id).hidden = !loaded;
   byId('pick').hidden = loaded;
-  for (const id of ['pick', 'replace', 'add', 'sensitivity', 'scan', 'sheet-title', 'speech-language', 'show-time', 'note-size']) byId(id).disabled = busy;
+  for (const id of ['pick', 'replace', 'add', 'sensitivity', 'scan', 'sheet-title', 'speech-language', 'show-time', 'note-size', 'remarks-mode']) byId(id).disabled = busy;
   byId('transcribe').disabled = busy || !state.cuts.length;
   byId('pdf').disabled = busy || !state.cuts.length;
   byId('progress-box').hidden = !busy;
@@ -265,6 +274,7 @@ function render() {
       <div class="timing">
         <label>秒数<input class="length" type="text" inputmode="decimal" maxlength="12"></label>
         <label>開始<input class="clock" type="text" maxlength="12"></label>
+        <textarea class="remarks" rows="3" placeholder="備考を入力"></textarea>
       </div>
       <textarea rows="3" placeholder="ナレーション、歌詞、BGM など"></textarea>
       <button type="button" class="icon-button"><svg aria-hidden="true"><use href="#trash"/></svg></button>`;
@@ -275,25 +285,25 @@ function render() {
     row.querySelector('.serial').textContent = 'CUT ' + cutNo(index);
     editTiming(row.querySelector('.length'), cut, next, index, false);
     editTiming(row.querySelector('.clock'), cut, next, index, true);
-    const note = row.querySelector('textarea');
+    const remarks = row.querySelector('.remarks');
+    remarks.setAttribute('aria-label', 'カット ' + cutNo(index) + ' の備考');
+    remarks.value = cut.remarks ?? '';
+    remarks.oninput = () => { cut.remarks = remarks.value; };
+    const note = row.querySelector('textarea:not(.remarks)');
     note.setAttribute('aria-label', 'カット ' + cutNo(index) + ' の音声メモ');
     note.value = cut.note;
     note.addEventListener('input', () => { cut.note = note.value; });
     const remove = row.querySelector('.icon-button');
-    const label = index === 0 ? '先頭カットは固定' : 'カット ' + cutNo(index) + ' の境目を削除';
+    const label = 'カット ' + cutNo(index) + ' を削除';
     remove.title = label;
     remove.setAttribute('aria-label', label);
-    if (index === 0) {
-      remove.hidden = true;
-    } else {
-      remove.onclick = () => {
-        const prev = state.cuts[index - 1];
-        if (cut.note.trim()) prev.note = [prev.note, cut.note].filter(Boolean).join('\n');
-        state.cuts.splice(index, 1);
-        render();
-        list.children[index - 1]?.querySelector('.preview').focus();
-      };
-    }
+    remove.onclick = () => {
+      const adjacent = state.cuts[index - 1] ?? state.cuts[index + 1];
+      if (adjacent && cut.note.trim()) adjacent.note = [adjacent.note, cut.note].filter(Boolean).join('\n');
+      state.cuts.splice(index, 1);
+      render();
+      list.children[Math.max(0, index - 1)]?.querySelector('.preview').focus();
+    };
     list.append(row);
   }
   refresh();
@@ -604,8 +614,8 @@ byId('scan').onclick = () => {
 byId('add').onclick = () => {
   video.pause();
   const start = video.currentTime;
-  if (start >= state.duration - .025 || state.cuts.some(cut => Math.abs(cut.start - start) < .04)) {
-    error('既存の境目や動画の末尾から少し離れた位置で追加してください。');
+  if (start >= state.duration - .025) {
+    error('動画の末尾から少し離れた位置で追加してください。');
     return;
   }
   run('キャプチャー中…', async signal => {
@@ -615,6 +625,13 @@ byId('add').onclick = () => {
     });
     const index = state.cuts.findIndex(item => item.start > start);
     const insertion = index === -1 ? state.cuts.length : index;
+    const existing = state.cuts.findIndex(item => Math.abs(item.start - start) < .04);
+    if (existing !== -1) {
+      state.cuts[existing].image = cut.image;
+      render();
+      list.children[existing]?.querySelector('textarea:not(.remarks)').focus();
+      return;
+    }
     state.cuts.splice(insertion, 0, cut);
     render();
     list.children[insertion]?.querySelector('textarea').focus();
@@ -802,7 +819,8 @@ async function makePdf() {
   const canvas = document.createElement('canvas');
   const width = 794, height = 1123, left = 39, right = 755, bottom = 1057;
   const showTime = byId('show-time').checked;
-  const numberX = left + 10, imageX = 99, timeX = 278, audioX = showTime ? 390 : timeX;
+  const remarksMode = byId('remarks-mode').checked;
+  const numberX = left + 10, imageX = 99, timeX = 278, audioX = showTime ? 420 : timeX;
   const audioFont = noteSize() * .25 * width / 210;
   const lineHeight = Math.ceil(audioFont * 1.35);
   const imageWidth = 161, imageHeight = 86, baseRow = 100;
@@ -831,24 +849,26 @@ async function makePdf() {
   for (const [index, cut] of state.cuts.entries()) {
     setFont(audioFont);
     const lines = wrapText(ctx, cut.note, right - audioX - 10);
+    const remarksLines = showTime && remarksMode ? wrapText(ctx, cut.remarks ?? '', audioX - timeX - 12) : [];
+    const totalLines = Math.max(lines.length, remarksLines.length);
     const next = state.cuts[index + 1]?.start ?? state.duration;
     const { start, length } = displayedTiming(cut, next);
     let offset = 0;
-    while (offset < lines.length) {
-      const rowHeight = Math.max(baseRow, lines.length * lineHeight + 22);
+    while (offset < totalLines) {
+      const rowHeight = Math.max(baseRow, totalLines * lineHeight + 22);
       const space = bottom - y;
       if (offset === 0 && y !== firstRow && rowHeight > space
         && (rowHeight <= bottom - firstRow || space < baseRow)) {
         plan.push([]);
         y = firstRow;
       }
-      const take = Math.min(lines.length - offset, Math.floor((bottom - y - 22) / lineHeight));
+      const take = Math.min(totalLines - offset, Math.floor((bottom - y - 22) / lineHeight));
       if (take < 1) throw new Error('Page header leaves no room for notes');
       const row = Math.max(offset ? 62 : baseRow, take * lineHeight + 22);
-      plan.at(-1).push({ cut, index, start, length, lines: lines.slice(offset, offset + take), y, row, continued: offset > 0 });
+      plan.at(-1).push({ cut, index, start, length, lines: lines.slice(offset, offset + take), remarksLines: remarksLines.slice(offset, offset + take), y, row, continued: offset > 0 });
       offset += take;
       y += row;
-      if (offset < lines.length) { plan.push([]); y = firstRow; }
+      if (offset < totalLines) { plan.push([]); y = firstRow; }
     }
   }
   const pages = [];
@@ -862,7 +882,7 @@ async function makePdf() {
     ctx.fillRect(left, header, right - left, 34);
     write('No.', numberX, header + 22, 13, colors.ink, 700);
     write('キャプチャー', imageX, header + 22, 13, colors.ink, 700);
-    if (showTime) write('秒数・開始', timeX, header + 22, 13, colors.ink, 700);
+    if (showTime) write(remarksMode ? '備考' : '秒数・開始', timeX, header + 22, 13, colors.ink, 700);
     write('音声メモ', audioX, header + 22, 13, colors.ink, 700);
     for (const entry of rows) {
       const { cut, start, length, continued, y, row } = entry;
@@ -876,13 +896,14 @@ async function makePdf() {
         ctx.fillStyle = '#18251e';
         ctx.fillRect(imageX, y + 7, imageWidth, imageHeight);
         ctx.drawImage(img, imageX + (imageWidth - w) / 2, y + 7 + (imageHeight - h) / 2, w, h);
-        if (showTime) {
+        if (showTime && !remarksMode) {
           write(seconds(length), timeX, y + 26, 16, colors.ink, 700);
           write(clock(start), timeX, y + 46, 13, colors.muted);
         }
       } else {
         write('続き', imageX, y + 26, 13, colors.green, 700);
       }
+      entry.remarksLines.forEach((line, i) => write(line, timeX, y + 10 + audioFont + i * lineHeight, audioFont));
       entry.lines.forEach((line, i) => write(line, audioX, y + 10 + audioFont + i * lineHeight, audioFont));
       rule(y + row);
     }
